@@ -284,6 +284,16 @@ class NMController(QMainWindow):
         # Actualizar la tabla
         self.update_device_table_all()
         
+    def format_uptime(self, uptime_str: str) -> str:
+        """Formats the uptime string to remove duplicates and ensure proper spacing."""
+        if not uptime_str:
+            return "0d 00:00:00"
+        # Remove any duplicate entries and extra spaces
+        parts = uptime_str.split()
+        if len(parts) >= 2:
+            return f"{parts[0]} {parts[1]}"
+        return uptime_str
+
     def update_device_table_all(self):
         """Actualiza la tabla con todos los dispositivos detectados."""
         # Asegurarse de que las actualizaciones de la UI se realizan en el hilo principal
@@ -302,7 +312,7 @@ class NMController(QMainWindow):
             self.device_table.setItem(row, 9, QTableWidgetItem(f"{device.temp:.1f}°C"))
             self.device_table.setItem(row, 10, QTableWidgetItem(f"{device.rssi} dBm"))
             self.device_table.setItem(row, 11, QTableWidgetItem(f"{device.free_heap:.1f} KB"))
-            self.device_table.setItem(row, 12, QTableWidgetItem(device.uptime))
+            self.device_table.setItem(row, 12, QTableWidgetItem(self.format_uptime(device.uptime)))
             self.device_table.setItem(row, 13, QTableWidgetItem(device.version))
             self.device_table.setItem(row, 14, QTableWidgetItem(device.board_type))
             self.device_table.setItem(row, 15, QTableWidgetItem(device.pool_in_use))
