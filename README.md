@@ -1,6 +1,6 @@
 # NM Controller (Python Version)
 
-This is a Python implementation of the NM Controller application, designed to monitor and control NM mining devices through a serial connection.
+This is a Python implementation of the NM Controller application, designed to monitor and control NM mining devices through a serial connection or neetwork connection.
 
 ## Features
 
