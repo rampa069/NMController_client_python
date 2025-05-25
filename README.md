@@ -1,63 +1,69 @@
-# NM Controller (Python Version)
+# NM Controller
 
-This is a Python implementation of the NM Controller application, designed to monitor and control NM mining devices through a serial connection.
+A desktop application for monitoring and managing network mining devices. The application provides a user-friendly interface to connect to and monitor mining devices through both serial and network connections.
 
 ## Features
 
-- Serial port communication with NM devices
-- Real-time monitoring of device status
-- Temperature and fan speed control
-- Mining start/stop control
-- Configuration management
-- Auto-start and auto-restart options
+- **Dual Connection Support**
+  - Serial connection for direct device communication
+  - Network connection for remote device management
+  - Automatic device discovery and connection
+
+- **Real-time Monitoring**
+  - Hash rate tracking
+  - Share submission monitoring
+  - Network and pool difficulty statistics
+  - Device temperature and performance metrics
+  - RSSI signal strength
+  - Memory usage (Free Heap)
+  - Device uptime tracking
+
+- **Device Management**
+  - Individual device configuration
+  - Web-based monitoring interface access
+  - Context menu for quick device actions
+  - Automatic device status updates
+
+- **User Interface**
+  - Tabbed interface for different connection types
+  - Real-time device status table
+  - Log window for operation feedback
+  - Device configuration window
+  - Network device discovery
 
 ## Requirements
 
-- Python 3.8 or higher
-- PyQt6
-- pyserial
+- Python 3.9 or higher
+- PySide6 6.6.1
+- pyserial 3.5
 
 ## Installation
 
-1. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+1. Clone the repository
+2. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+## Building
+
+### Windows
+Run the `build_windows.bat` script to create a Windows executable.
+
+### macOS
+Run the `build_macos.sh` script to create a macOS application bundle.
 
 ## Usage
 
-1. Run the application:
-```bash
-python main.py
-```
-
-2. Select the appropriate serial port from the dropdown menu
-3. Click "Connect" to establish connection with the device
-4. Use the interface to monitor and control your NM device
-
-## Configuration
-
-The application can be configured through the Configuration window, accessible from the main interface. Settings include:
-
-- Serial port baud rate
-- Connection timeout
-- Auto-start mining
-- Auto-restart on error
-- Temperature limits
-
-## File Structure
-
-- `main.py`: Main application window and entry point
-- `config_window.py`: Configuration dialog implementation
-- `nm_device.py`: NM device communication and control
-- `requirements.txt`: Python package dependencies
+1. Launch the application
+2. Choose your connection method:
+   - Serial: Select the port and click "Connect"
+   - Network: Select the device from the list and click "Connect"
+3. Monitor device status in the main table
+4. Use the context menu (right-click) on devices for additional options:
+   - Configure Device
+   - Open Web Monitor
 
 ## License
 
-This project is licensed under the same terms as the original C# implementation. 
+This project is licensed under the MIT License - see the LICENSE file for details. 
