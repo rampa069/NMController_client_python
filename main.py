@@ -4,7 +4,7 @@ import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QHBoxLayout, QLabel, QPushButton, QComboBox,
                             QLineEdit, QMessageBox, QTableWidget, QTableWidgetItem,
-                            QTabWidget, QGroupBox, QTextEdit, QMenu)
+                            QTabWidget, QGroupBox, QTextEdit, QMenu, QGridLayout)
 from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QIcon, QPixmap, QAction
 import serial
@@ -51,28 +51,85 @@ class NMController(QMainWindow):
         self.log_window.setMinimumHeight(80)
         layout.addWidget(self.log_window)
         
-        # Create tab widget
-        tab_widget = QTabWidget()
-        tab_widget.setMaximumHeight(120)
-        layout.addWidget(tab_widget)
+        # Create connection controls section
+        connection_section = QWidget()
+        connection_layout = QHBoxLayout(connection_section)
         
-        # Create Serial tab
-        serial_tab = QWidget()
-        serial_layout = QVBoxLayout(serial_tab)
-        self.create_serial_controls(serial_layout)
-        tab_widget.addTab(serial_tab, "Serial Connection")
+        # Create Serial Connection Group
+        serial_group = QGroupBox("Serial Connection")
+        serial_layout = QVBoxLayout()
         
-        # Create Network tab
-        network_tab = QWidget()
-        network_layout = QVBoxLayout(network_tab)
+        # Port and Baud controls
+        port_baud_layout = QHBoxLayout()
+        port_baud_layout.addWidget(QLabel("Port:"))
+        self.port_combo = QComboBox()
+        self.refresh_ports()
+        port_baud_layout.addWidget(self.port_combo)
         
-        # Setup timer for updates
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.update_devices)
+        port_baud_layout.addWidget(QLabel("Baud:"))
+        self.baud_combo = QComboBox()
+        self.baud_combo.addItems(['115200', '230400', '460800', '921600'])
+        self.baud_combo.setCurrentText('115200')
+        port_baud_layout.addWidget(self.baud_combo)
         
-        # Create network controls after timer is initialized
-        self.create_network_controls(network_layout)
-        tab_widget.addTab(network_tab, "Network Connection")
+        self.connect_button = QPushButton("Connect")
+        self.connect_button.clicked.connect(self.toggle_serial_connection)
+        port_baud_layout.addWidget(self.connect_button)
+        
+        serial_layout.addLayout(port_baud_layout)
+        
+        # WiFi Configuration
+        wifi_group = QGroupBox("WiFi Configuration")
+        wifi_layout = QGridLayout()
+        wifi_layout.setSpacing(5)
+        
+        # SSID
+        wifi_layout.addWidget(QLabel("SSID:"), 0, 0)
+        self.ssid_input = QLineEdit()
+        wifi_layout.addWidget(self.ssid_input, 0, 1)
+        
+        # Password
+        wifi_layout.addWidget(QLabel("Password:"), 1, 0)
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        wifi_layout.addWidget(self.password_input, 1, 1)
+        
+        # BTC
+        wifi_layout.addWidget(QLabel("BTC:"), 2, 0)
+        self.btc_input = QLineEdit()
+        wifi_layout.addWidget(self.btc_input, 2, 1)
+        
+        # Configure button
+        self.configure_wifi_button = QPushButton("Configure WiFi")
+        self.configure_wifi_button.clicked.connect(self.configure_wifi)
+        wifi_layout.addWidget(self.configure_wifi_button, 3, 0, 1, 2)
+        
+        wifi_group.setLayout(wifi_layout)
+        serial_layout.addWidget(wifi_group)
+        
+        serial_group.setLayout(serial_layout)
+        connection_layout.addWidget(serial_group)
+        
+        # Create Network Connection Group
+        network_group = QGroupBox("Network Connection")
+        network_layout = QVBoxLayout()
+        
+        # Create instruction label
+        instruction_label = QLabel("To configure a device:\n"
+                                 "1. Connect via Serial to configure WiFi\n"
+                                 "2. Once connected to network, right-click\n"
+                                 "   on the device in the list below\n"
+                                 "3. Select 'Configure Device' or\n"
+                                 "   'Open Web Monitor' from the menu")
+        instruction_label.setWordWrap(True)
+        instruction_label.setStyleSheet("QLabel { padding: 10px; font-size: 12pt; }")
+        
+        network_layout.addWidget(instruction_label)
+        network_group.setLayout(network_layout)
+        connection_layout.addWidget(network_group)
+        
+        # Add connection section to main layout
+        layout.addWidget(connection_section)
         
         # Create device table
         self.device_table = QTableWidget()
@@ -87,12 +144,19 @@ class NMController(QMainWindow):
         self.device_table.customContextMenuRequested.connect(self.show_context_menu)
         layout.addWidget(self.device_table)
         
+        # Setup timer for updates
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update_devices)
+        
         # Start listening for configuration updates
         self.start_config_listener()
         
-        # Conectar señales a los métodos de UI
+        # Connect signals
         self.update_list_signal.connect(self.update_device_list)
         self.update_table_signal.connect(self.update_device_table_all)
+        
+        # Initially disable WiFi configuration
+        self.disable_wifi_config()
         
     def start_config_listener(self):
         """Starts a thread to listen for configuration and status updates."""
@@ -218,56 +282,114 @@ class NMController(QMainWindow):
         """Adds a message to the log (in English)."""
         self.log_window.append(message)
         
-    def create_serial_controls(self, parent_layout):
-        group = QGroupBox("Serial Connection")
-        layout = QVBoxLayout()
+    def disable_wifi_config(self):
+        """Disable WiFi configuration controls."""
+        self.ssid_input.setEnabled(False)
+        self.password_input.setEnabled(False)
+        self.btc_input.setEnabled(False)
+        self.configure_wifi_button.setEnabled(False)
         
-        connection_layout = QHBoxLayout()
-        self.port_combo = QComboBox()
-        self.refresh_button = QPushButton("Refresh")
-        self.connect_button = QPushButton("Connect")
+    def enable_wifi_config(self):
+        """Enable WiFi configuration controls."""
+        self.ssid_input.setEnabled(True)
+        self.password_input.setEnabled(True)
+        self.btc_input.setEnabled(True)
+        self.configure_wifi_button.setEnabled(True)
         
-        connection_layout.addWidget(QLabel("Port:"))
-        connection_layout.addWidget(self.port_combo)
-        connection_layout.addWidget(self.refresh_button)
-        connection_layout.addWidget(self.connect_button)
+    def configure_wifi(self):
+        """Configure WiFi settings for the device."""
+        if not self.serial_port:
+            self.log("No serial connection available")
+            return
+            
+        ssid = self.ssid_input.text().strip()
+        password = self.password_input.text().strip()
+        btc = self.btc_input.text().strip()
         
-        layout.addLayout(connection_layout)
-        group.setLayout(layout)
-        parent_layout.addWidget(group)
-        
-        # Connect signals
-        self.refresh_button.clicked.connect(self.refresh_ports)
-        self.connect_button.clicked.connect(self.toggle_serial_connection)
-        
-        # Initialize
-        self.refresh_ports()
-        
-    def create_network_controls(self, parent_layout):
-        group = QGroupBox("Network Connection")
-        layout = QVBoxLayout()
-        
-        connection_layout = QHBoxLayout()
-        self.network_combo = QComboBox()
-        self.network_connect_button = QPushButton("Connect")
-        self.network_connect_button.setEnabled(False)  # Disable the button
-        self.config_button = QPushButton("Configure All")
-        
-        connection_layout.addWidget(QLabel("Device:"))
-        connection_layout.addWidget(self.network_combo)
-        connection_layout.addWidget(self.network_connect_button)
-        connection_layout.addWidget(self.config_button)
-        
-        layout.addLayout(connection_layout)
-        group.setLayout(layout)
-        parent_layout.addWidget(group)
-        
-        # Connect signals
-        self.config_button.clicked.connect(lambda: self.open_config_window())
-        
-        # Update device list when new data is received
-        self.update_timer.timeout.connect(self.update_device_list)
-        
+        if not ssid or not password:
+            QMessageBox.warning(self, "Configuration Error", 
+                              "SSID and Password are required")
+            return
+            
+        try:
+            # Crear el objeto JSON de configuración solo con campos que tienen datos
+            config = {}
+            if ssid:
+                config["ssid"] = ssid
+            if password:
+                config["password"] = password
+            if btc:
+                config["btc"] = btc
+
+            # Convertir a JSON y enviar
+            json_config = json.dumps(config)
+            self.log(f"Sending WiFi configuration: {json_config}")
+            
+            # Enviar la configuración
+            self.serial_port.write(f"{json_config}\r\n".encode())
+            self.serial_port.flush()  # Asegurar que se envíe
+            
+            # Esperar y leer la respuesta
+            time.sleep(0.5)  # Dar tiempo para que el dispositivo procese
+            response = ""
+            while self.serial_port.in_waiting:
+                line = self.serial_port.readline().decode().strip()
+                # Eliminar códigos ANSI
+                line = line.replace('\x1b[32m', '').replace('\x1b[0m', '')
+                response += line + "\n"
+                self.log(f"Device response: {line}")
+            
+            # Verificar la respuesta
+            if "Save Wifi SSID" in response and "Save Wifi Password" in response:
+                QMessageBox.information(self, "Success", 
+                                      "WiFi configuration sent successfully.\n\n"
+                                      "Please manually restart the device for the changes to take effect.")
+            else:
+                QMessageBox.warning(self, "Warning", 
+                                  "Unexpected response from device. Please verify the configuration.")
+                
+        except Exception as e:
+            self.log(f"Error configuring WiFi: {str(e)}")
+            QMessageBox.critical(self, "Error", 
+                               f"Error configuring WiFi: {str(e)}")
+            
+    def toggle_serial_connection(self):
+        """Toggle serial connection."""
+        if not self.is_connected:
+            try:
+                port = self.port_combo.currentText()
+                baud_rate = int(self.baud_combo.currentText())
+                
+                self.serial_port = serial.Serial(port, baud_rate, timeout=1)
+                self.is_connected = True
+                self.connect_button.setText("Disconnect")
+                self.log(f"Connected to {port} at {baud_rate} baud")
+                
+                # Enable WiFi configuration when connected via serial
+                self.enable_wifi_config()
+                
+            except Exception as e:
+                self.log(f"Error connecting to {port}: {str(e)}")
+                QMessageBox.critical(self, "Connection Error", 
+                                   f"Error connecting to {port}: {str(e)}")
+                self.serial_port = None
+                self.is_connected = False
+                self.connect_button.setText("Connect")
+                self.disable_wifi_config()
+        else:
+            try:
+                if self.serial_port:
+                    self.serial_port.close()
+                self.serial_port = None
+                self.is_connected = False
+                self.connect_button.setText("Connect")
+                self.log("Disconnected from serial port")
+                self.disable_wifi_config()
+            except Exception as e:
+                self.log(f"Error disconnecting: {str(e)}")
+                QMessageBox.critical(self, "Disconnection Error", 
+                                   f"Error disconnecting: {str(e)}")
+            
     def refresh_ports(self):
         self.port_combo.clear()
         ports = [port.device for port in serial.tools.list_ports.comports()]
@@ -275,20 +397,7 @@ class NMController(QMainWindow):
         self.log(f"Serial ports found: {', '.join(ports) if ports else 'None'}")
         
     def update_device_list(self):
-        """Actualiza la lista de dispositivos en el combo box."""
-        current_text = self.network_combo.currentText()
-        self.network_combo.clear()
-        
-        # Añadir todos los dispositivos conocidos
-        for device in self.devices:
-            self.network_combo.addItem(f"{device.device_id} ({device.ip})", device)
-            
-        # Restaurar la selección anterior si es posible
-        if current_text:
-            index = self.network_combo.findText(current_text)
-            if index >= 0:
-                self.network_combo.setCurrentIndex(index)
-        
+        """Actualiza la lista de dispositivos en la tabla."""
         # Actualizar la tabla
         self.update_device_table_all()
         
@@ -327,35 +436,15 @@ class NMController(QMainWindow):
             self.device_table.setItem(row, 16, QTableWidgetItem(device.update_time))
         self.device_table.resizeColumnsToContents()
         
-    def toggle_serial_connection(self):
-        if not self.is_connected:
-            try:
-                port = self.port_combo.currentText()
-                self.log(f"Connecting to serial port {port}...")
-                self.serial_port = serial.Serial(port, 115200, timeout=1)
-                self.is_connected = True
-                self.connect_button.setText("Disconnect")
-                self.update_timer.start(1000)  # Update every second
-                self.log("Serial connection established.")
-            except Exception as e:
-                error_msg = f"Error connecting: {str(e)}"
-                self.log(error_msg)
-                QMessageBox.critical(self, "Error", error_msg)
-        else:
-            self.serial_port.close()
-            self.serial_port = None
-            self.is_connected = False
-            self.connect_button.setText("Connect")
-            self.update_timer.stop()
-            self.log("Serial connection closed.")
-            
     def update_devices(self):
         if not self.is_connected:
             return
             
         try:
             device = NMDevice(self.serial_port, self.network_device)
+            self.log("Requesting device status...")
             status = device.get_status()
+            self.log(f"Device status received: {status}")
             
             # Update table
             row = 0
@@ -377,6 +466,21 @@ class NMController(QMainWindow):
             self.device_table.setItem(row, 14, QTableWidgetItem(""))       # board_type
             self.device_table.setItem(row, 15, QTableWidgetItem(""))       # pool_in_use
             self.device_table.setItem(row, 16, QTableWidgetItem(time.strftime("%Y-%m-%d %H:%M:%S")))
+            
+            # Intentar obtener la configuración si no la tenemos
+            if not self.device_configs:
+                self.log("No device configuration found, attempting to get it...")
+                try:
+                    config = device.get_config()
+                    if config:
+                        self.log(f"Configuration received: {config}")
+                        if 'IP' in config:
+                            self.device_configs[config['IP']] = config
+                            self.log(f"Device configuration stored for IP: {config['IP']}")
+                    else:
+                        self.log("No configuration received from device")
+                except Exception as e:
+                    self.log(f"Error getting configuration: {str(e)}")
             
         except Exception as e:
             error_msg = f"Error reading data: {str(e)}"

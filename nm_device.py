@@ -222,8 +222,15 @@ class NMDevice:
     def send_command(self, command: str) -> bool:
         try:
             if self.serial_port:
-                self.serial_port.write(f"{command}\n".encode())
+                print(f"Sending command to serial port: {command}")
+                # Enviar el comando con el formato correcto para ESP32
+                self.serial_port.write(f"{command}\r\n".encode())
+                # Esperar un momento para asegurar que el comando se envía
+                time.sleep(0.1)
+                # Limpiar el buffer de entrada antes de leer la respuesta
+                self.serial_port.reset_input_buffer()
             elif self.network_device:
+                print(f"Sending command to network device: {command}")
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
                 sock.connect((self.network_device.ip, self.network_device.port))
@@ -236,36 +243,168 @@ class NMDevice:
             
     def read_response(self) -> Optional[str]:
         try:
-            if self.serial_port and self.serial_port.in_waiting:
-                return self.serial_port.readline().decode().strip()
+            if self.serial_port:
+                # Esperar un momento para que llegue la respuesta
+                time.sleep(0.2)
+                if self.serial_port.in_waiting:
+                    response = self.serial_port.readline().decode().strip()
+                    print(f"Raw response from serial port: {response}")
+                    return response
+                else:
+                    print("No data available in serial port")
             elif self.network_device:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
                 sock.connect((self.network_device.ip, self.network_device.port))
                 response = sock.recv(1024).decode().strip()
+                print(f"Raw response from network device: {response}")
                 sock.close()
                 return response
         except Exception as e:
             print(f"Error reading response: {e}")
         return None
         
+    def configure_wifi(self, ssid: str, password: str, btc_address: str = None) -> bool:
+        """Configura la conexión WiFi del dispositivo usando el protocolo JSON."""
+        try:
+            print(f"Configurando WiFi para SSID: {ssid}")
+            # Crear el objeto JSON de configuración
+            config = {
+                "ssid": ssid,
+                "password": password
+            }
+            if btc_address:
+                config["btc"] = btc_address
+
+            # Convertir a JSON y enviar
+            json_config = json.dumps(config)
+            if self.send_command(json_config):
+                response = self.read_response()
+                print(f"WiFi config response: {response}")
+                if response and ("Save Wifi SSID" in response or "Save Wifi Password" in response):
+                    return True
+            return False
+        except Exception as e:
+            print(f"Error configuring WiFi: {e}")
+            return False
+
+    def get_wifi_status(self) -> Optional[Dict]:
+        """Obtiene el estado de la configuración WiFi."""
+        try:
+            if self.send_command("status"):
+                response = self.read_response()
+                print(f"WiFi status response: {response}")
+                if response:
+                    if "WiFi configuration time left:" in response:
+                        time_left = response.split("time left:")[1].strip().replace("s", "")
+                        return {
+                            "status": "configuring",
+                            "time_left": int(time_left)
+                        }
+                    elif "Connected to" in response:
+                        return {
+                            "status": "connected",
+                            "ssid": response.split("Connected to")[1].strip()
+                        }
+            return None
+        except Exception as e:
+            print(f"Error getting WiFi status: {e}")
+            return None
+        
+    def get_config(self) -> Optional[Dict]:
+        """Obtiene la configuración del dispositivo."""
+        try:
+            print("Sending get_config command...")
+            # Intentar primero con el comando de estado
+            if self.send_command("status"):
+                response = self.read_response()
+                print(f"Status response received: {response}")
+                if response:
+                    # Si estamos en modo de configuración WiFi
+                    if "WiFi configuration time left:" in response:
+                        time_left = response.split("time left:")[1].strip().replace("s", "")
+                        return {
+                            "wifi_config_time": int(time_left),
+                            "status": "configuring"
+                        }
+                    # Si recibimos el MD5 del firmware
+                    elif "NMMiner Firmware md5" in response:
+                        md5 = response.split("[")[1].split("]")[0]
+                        return {
+                            "firmware_md5": md5,
+                            "status": "initializing"
+                        }
+                    # Si está intentando conectarse
+                    elif "Try to connect" in response:
+                        return {
+                            "status": "connecting",
+                            "message": response
+                        }
+            
+            # Intentar con el comando de configuración
+            if self.send_command("config"):
+                response = self.read_response()
+                print(f"Config response received: {response}")
+                if response:
+                    return {
+                        "status": "configuring",
+                        "message": response
+                    }
+            
+            return None
+        except Exception as e:
+            print(f"Error getting config: {e}")
+            return None
+        
     def get_status(self) -> DeviceStatus:
+        print("Sending status command...")
         if self.send_command("status"):
             response = self.read_response()
+            print(f"Status response received: {response}")
             if response:
                 try:
-                    data = json.loads(response)
-                    self.status = DeviceStatus(
-                        device_id=data.get("id", ""),
-                        hash_rate=float(data.get("hash_rate", 0)),
-                        temperature=float(data.get("temperature", 0)),
-                        fan_speed=int(data.get("fan_speed", 0)),
-                        is_mining=bool(data.get("is_mining", False))
-                    )
-                except json.JSONDecodeError:
-                    self.status.error = "Invalid response format"
+                    # Si estamos en modo de configuración WiFi
+                    if "WiFi configuration time left:" in response:
+                        self.status = DeviceStatus(
+                            device_id="NM Device (WiFi Config Mode)",
+                            hash_rate=0.0,
+                            temperature=0.0,
+                            fan_speed=0,
+                            is_mining=False
+                        )
+                    # Si está inicializando
+                    elif "NMMiner Firmware md5" in response:
+                        self.status = DeviceStatus(
+                            device_id="NM Device (Initializing)",
+                            hash_rate=0.0,
+                            temperature=0.0,
+                            fan_speed=0,
+                            is_mining=False
+                        )
+                    # Si está intentando conectarse
+                    elif "Try to connect" in response:
+                        self.status = DeviceStatus(
+                            device_id="NM Device (Connecting)",
+                            hash_rate=0.0,
+                            temperature=0.0,
+                            fan_speed=0,
+                            is_mining=False
+                        )
+                    else:
+                        # Por ahora, devolvemos un estado básico
+                        self.status = DeviceStatus(
+                            device_id="NM Device",
+                            hash_rate=0.0,
+                            temperature=0.0,
+                            fan_speed=0,
+                            is_mining=False
+                        )
                 except Exception as e:
+                    print(f"Error processing status: {e}")
                     self.status.error = str(e)
+            else:
+                print("No response received for status command")
+                self.status.error = "No response"
         return self.status
         
     def start_mining(self) -> bool:

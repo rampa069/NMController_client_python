@@ -31,6 +31,10 @@ A desktop application for monitoring and managing network mining devices. The ap
   - Device configuration window
   - Network device discovery
 
+## Screenshot
+
+![NM Controller Screenshot](screenshot.png)
+
 ## Requirements
 
 - Python 3.9 or higher
