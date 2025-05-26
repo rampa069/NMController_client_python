@@ -1,5 +1,6 @@
 import sys
 import json
+import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QHBoxLayout, QLabel, QPushButton, QComboBox,
                             QLineEdit, QMessageBox, QTableWidget, QTableWidgetItem,
@@ -21,7 +22,14 @@ class NMController(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("NM Controller")
-        self.setWindowIcon(QIcon("nm.ico"))
+        
+        # Set application icon
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nm.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            print(f"Icon file not found at: {icon_path}")
+            
         self.resize(1200, 800)
         
         # Initialize variables

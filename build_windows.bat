@@ -3,6 +3,8 @@
 REM Crear el ejecutable para Windows
 pyinstaller --name="NMController" ^
             --windowed ^
+            --icon=nm.ico ^
+            --add-data "nm.ico;." ^
             --hidden-import=PySide6.QtXml ^
             --hidden-import=PySide6.QtNetwork ^
             --hidden-import=PySide6.QtCore ^
@@ -10,6 +12,7 @@ pyinstaller --name="NMController" ^
             --hidden-import=PySide6.QtWidgets ^
             --hidden-import=serial ^
             --hidden-import=serial.tools.list_ports ^
+            --clean ^
             main.py
 
 REM Crear carpeta exe si no existe
@@ -21,4 +24,7 @@ move dist\NMController.exe ..\exe\windows\
 REM Limpiar archivos temporales
 rmdir /s /q build
 rmdir /s /q dist
-del /q *.spec 
+del /q *.spec
+
+echo Build completed!
+pause 
