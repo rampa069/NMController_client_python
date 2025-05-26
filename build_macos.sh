@@ -54,3 +54,5 @@ cp nm.ico dist/NMController.app/Contents/Resources/
 
 # Limpiar archivos temporales
 rm -rf build *.spec icon.icns
+mv dist/NMController.app release/
+
