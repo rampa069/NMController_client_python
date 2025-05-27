@@ -41,6 +41,7 @@ class NMController(QMainWindow):
         self.is_connected = False
         self.devices = []
         self.device_configs = {}  # Diccionario para almacenar las configuraciones
+        self._updating_ui = False  # Flag para evitar actualizaciones recursivas
         
         # Create main widget and layout
         main_widget = QWidget()
@@ -204,61 +205,74 @@ class NMController(QMainWindow):
         
     def handle_config_received(self, config):
         """Maneja la recepción de configuración en el hilo principal."""
-        if 'IP' in config:
-            self.device_configs[config['IP']] = config
-            self.log(f"Configuration received from {config['IP']}")
-            if not any(d.ip == config['IP'] for d in self.devices):
-                device = NetworkDevice(
-                    ip=config['IP'],
-                    port=12345,
-                    device_id=config.get('BoardType', config['IP']),
-                    is_online=True,
-                    hash_rate="",
-                    share="",
-                    net_diff="",
-                    pool_diff="",
-                    last_diff="",
-                    best_diff="",
-                    valid=0,
-                    progress=0.0,
-                    temp=0.0,
-                    rssi=0,
-                    free_heap=0.0,
-                    uptime="",
-                    version=config.get('Version', ''),
-                    board_type=config.get('BoardType', ''),
-                    pool_in_use=config.get('PoolInUse', ''),
-                    update_time=""
-                )
-                self.devices.append(device)
-            # Emitir señales para actualizar UI
-            self.update_list_signal.emit()
-            self.update_table_signal.emit()
+        if self._updating_ui:
+            return
+            
+        self._updating_ui = True
+        try:
+            if 'IP' in config:
+                self.device_configs[config['IP']] = config
+                self.log(f"Configuration received from {config['IP']}")
+                if not any(d.ip == config['IP'] for d in self.devices):
+                    device = NetworkDevice(
+                        ip=config['IP'],
+                        port=12345,
+                        device_id=config.get('BoardType', config['IP']),
+                        is_online=True,
+                        hash_rate="",
+                        share="",
+                        net_diff="",
+                        pool_diff="",
+                        last_diff="",
+                        best_diff="",
+                        valid=0,
+                        progress=0.0,
+                        temp=0.0,
+                        rssi=0,
+                        free_heap=0.0,
+                        uptime="",
+                        version=config.get('Version', ''),
+                        board_type=config.get('BoardType', ''),
+                        pool_in_use=config.get('PoolInUse', ''),
+                        update_time=""
+                    )
+                    self.devices.append(device)
+                # Actualizar UI directamente en lugar de emitir señales
+                self.update_device_table_all()
+        finally:
+            self._updating_ui = False
             
     def handle_status_received(self, ip, status):
         """Maneja la recepción de estado en el hilo principal."""
-        for device in self.devices:
-            if device.ip == ip:
-                device.hash_rate = status.get('HashRate', device.hash_rate)
-                device.share = status.get('Share', device.share)
-                device.net_diff = status.get('NetDiff', device.net_diff)
-                device.pool_diff = status.get('PoolDiff', device.pool_diff)
-                device.last_diff = status.get('LastDiff', device.last_diff)
-                device.best_diff = status.get('BestDiff', device.best_diff)
-                device.valid = status.get('Valid', device.valid)
-                device.progress = status.get('Progress', device.progress)
-                device.temp = status.get('Temp', device.temp)
-                device.rssi = status.get('RSSI', device.rssi)
-                device.free_heap = status.get('FreeHeap', device.free_heap)
-                device.uptime = status.get('Uptime', device.uptime)
-                device.version = status.get('Version', device.version)
-                device.board_type = status.get('BoardType', device.board_type)
-                device.pool_in_use = status.get('PoolInUse', device.pool_in_use)
-                device.update_time = time.strftime("%Y-%m-%d %H:%M:%S")
-                device.is_online = True
-                break
-        # Emitir señal para actualizar la tabla
-        self.update_table_signal.emit()
+        if self._updating_ui:
+            return
+            
+        self._updating_ui = True
+        try:
+            for device in self.devices:
+                if device.ip == ip:
+                    device.hash_rate = status.get('HashRate', device.hash_rate)
+                    device.share = status.get('Share', device.share)
+                    device.net_diff = status.get('NetDiff', device.net_diff)
+                    device.pool_diff = status.get('PoolDiff', device.pool_diff)
+                    device.last_diff = status.get('LastDiff', device.last_diff)
+                    device.best_diff = status.get('BestDiff', device.best_diff)
+                    device.valid = status.get('Valid', device.valid)
+                    device.progress = status.get('Progress', device.progress)
+                    device.temp = status.get('Temp', device.temp)
+                    device.rssi = status.get('RSSI', device.rssi)
+                    device.free_heap = status.get('FreeHeap', device.free_heap)
+                    device.uptime = status.get('Uptime', device.uptime)
+                    device.version = status.get('Version', device.version)
+                    device.board_type = status.get('BoardType', device.board_type)
+                    device.pool_in_use = status.get('PoolInUse', device.pool_in_use)
+                    device.update_time = time.strftime("%Y-%m-%d %H:%M:%S")
+                    device.is_online = True
+                    break
+            # Actualizar UI directamente en lugar de emitir señales
+            self.update_device_table_all()
+        finally:
+            self._updating_ui = False
         
     def show_context_menu(self, position):
         """Muestra el menú contextual al hacer clic derecho en la tabla."""
@@ -301,28 +315,38 @@ class NMController(QMainWindow):
         
     def log(self, message: str):
         """Adds a message to the log (in English)."""
-        # Incrementar el contador de líneas
-        self.current_log_lines += 1
-        
-        # Si excedemos el límite, eliminar las líneas más antiguas
-        if self.current_log_lines > self.max_log_lines:
-            # Obtener el texto actual
-            current_text = self.log_window.toPlainText()
-            # Dividir en líneas
-            lines = current_text.split('\n')
-            # Mantener solo las últimas max_log_lines líneas
-            lines = lines[-self.max_log_lines:]
-            # Actualizar el texto
-            self.log_window.setPlainText('\n'.join(lines))
-            self.current_log_lines = self.max_log_lines
-        
-        # Agregar el nuevo mensaje
-        self.log_window.append(message)
-        
-        # Scroll to the bottom
-        self.log_window.verticalScrollBar().setValue(
-            self.log_window.verticalScrollBar().maximum()
-        )
+        if not hasattr(self, '_updating_ui'):
+            self._updating_ui = False
+            
+        if self._updating_ui:
+            return
+            
+        self._updating_ui = True
+        try:
+            # Incrementar el contador de líneas
+            self.current_log_lines += 1
+            
+            # Si excedemos el límite, eliminar las líneas más antiguas
+            if self.current_log_lines > self.max_log_lines:
+                # Obtener el texto actual
+                current_text = self.log_window.toPlainText()
+                # Dividir en líneas
+                lines = current_text.split('\n')
+                # Mantener solo las últimas max_log_lines líneas
+                lines = lines[-self.max_log_lines:]
+                # Actualizar el texto
+                self.log_window.setPlainText('\n'.join(lines))
+                self.current_log_lines = self.max_log_lines
+            
+            # Agregar el nuevo mensaje
+            self.log_window.append(message)
+            
+            # Scroll to the bottom
+            self.log_window.verticalScrollBar().setValue(
+                self.log_window.verticalScrollBar().maximum()
+            )
+        finally:
+            self._updating_ui = False
         
     def disable_wifi_config(self):
         """Disable WiFi configuration controls."""
